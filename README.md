@@ -1,124 +1,135 @@
-# Tổng hợp ý tưởng (tạm thời), mọi người cùng đóng góp và cho ý kiên
-Please respect Kaggle rules
--	Only submit to test new ideas, test LB
--	Or when there are un-used submissions (do not create 2 accounts)
--	Any external dataset, pre-trained weights must be posted in the forum
+# Requirement
+Main requirement:
+* Pytorch 0.4.1
 
-# Dataset: 340 classes
-- Train: unbalanced distribution
-- Test: (almost) balanced distribution
-Test draws were collected from a different period, different locations
-=> countries are useless, time (in the train set) is difficult to exploited
+If you miss any package, please install it by: `pip install missing_package`
 
-## Proposed split
-- Train set was already shuffled, no need to re-shuffled again
-- Keep last 10K for blending – blending set, please consider this sub-set as test set, do not even use it for the validation in level 0
-- Number of draws per class
-snowman     340029
-potato      329204
-calendar    321981
-...
-ceiling fan    115413
-bed            113862
-panda          113613
+# Data split
+Change following parameters:  
+* `skiprows`: Number of row you want to skip  
+Ex: If you want to skip 30k data, `skiprows=(1,30000)`
+* `nrows`: Number of data / class  
+Default: 50000 data / class
+* `root_csv`: Directory of your `train_simplified` folder  
+Ex: 
+`/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/csv/train_simplified/`
+* `split_csv`: Directory where you want to save splited data into  
+Ex:  
+`/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/50k/`
 
 
-# Approach
-Due to the size of the data, it is fine to use blending instead of stacking
-## Level 0
-Please keep the model weights (and the seeds) and produce probabilities for the Test set and the blending set!
+Run:  
+`python split_data_top.py`  
+Output:  
+There are 340 csv files of `train` and `valid` are saved at your `split_csv`. Each csv file has `nrows` data.
+
+# Run model  
+* Configure `train.yml`  
+In this file, please change the `main parameters` as following:  
+  * `train_split`  
+  Path to `train` folder: `{split_csv}/train` 
+  
+  * `train_token`  
+  Dont care, but it is same as `train_split`
+  * `valid_split`  
+  Path to `valid` folder: `{split_csv}/valid`
+  * `valid_token`  
+  Dont care, but it is same as `valid_split`  
+
+  You can change other parameters `workers`, `batch_size`, ... to be suiatable for your environement
+  
+* Run  
+     ```bash
+     bash run_model.sh
+     ```
+  Log and checkpoints will be saved to `./logs/se_resnext101_50k`. Change it as you want
+  
+# Predict model  
+* Configure `inference.yml`  
+In this file, please change:  
+  * `infer_csv`  
+  Path to your `test_simplified.csv` file
+  
+* Run
+     ```bash
+     bash predict_5best.sh
+     ```
+  We use multiple checkpoints (snapshot) during training. Ensembling 5 best checkpoints will give
+  free 0.0005 boost.  
+  Outputs are the `logits` will be saved into your `log` folder that you defined above
  
-### GrayImage-based models
-If needed, external dataset could be used here
-(Bac, please comment here!)
+# Predict dataset for cleaning 
+* Configure `inference.yml`  
+In this file, please change:  
+  * `infer_csv`  
+  Comment this line
+  * `data_clean_train`  
+  Path to train data you want to clean
+  * `data_clean_valid`  
+  Path to valid data you want to clean
+  
+* Run
+     ```bash
+     bash predict_data_for_clean.sh
+     ```
+  Please change to the best checkpoint of your model you use for clean data  
+  Ex: `LOGDIR=$(pwd)/logs/clean_model_2_resnet34/`
 
-### ColorImage-based models
-If needed, external dataset could be used here
+# Clean data
+In this file, change following parameter correct to your environment  
+* `data_clean_train`  
+Path to `train data` you want to clean.  
+Ex: `/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/30k/data_2/train/`
 
-### Stroke-based models
--	LSTM
-Around LB 0.87 with 75K draws/class
--	RANET (another type of LSTM)
-Around LB 0.87 with 75K draws/class
--	Wavenet
-Around LB 0.87 with 75K draws/class
-- ConvLSTM, mỗi timestep là một bức ảnh đang được vẽ, timestep sau hoàn thiện hơn timestep trước
-(idea from Hau)
+* `data_clean_valid`  
+Path to `valid data` you want to clean.  
+Ex: `/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/30k/data_2/valid/`
 
-## Level 1
-- Feed the features from Level 0 in to XGBOOST, RF, NN (CNN)
-- Extra features: https://www.kaggle.com/c/quickdraw-doodle-recognition/discussion/70680
-- Statistics features from raw data: # strokes, # points ...
+* `data_clean_train_out`  
+Output of train data after clean.  
+Ex: `/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/30k/data_2/train/`
+    
+* `data_clean_valid_out`  
+Output of valid data after clean.  
+Ex: `/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/30k/data_2_cleannn/valid/`
 
-## Level 2
-Weighted average of predictions from Level 1 => One final submission
-## Post-processing
-Balance the distribution from Level 2 => One final submission
-LB improvement: 0.005
+* `data_train_predict`  
+Logit prediction of `data_clean_train` when using a model to predict.  
+Ex: `./logs/clean_model_1_resnet34/dataset.predictions.data_2_train.logits.satge1.5.npy`
 
-# Label Encoder proposal
-word_encoder = LabelEncoder()
-word_encoder.classes_ = np.array(['The Eiffel Tower', 'The Great Wall of China', 'The Mona Lisa',
-       'airplane', 'alarm clock', 'ambulance', 'angel',
-       'animal migration', 'ant', 'anvil', 'apple', 'arm', 'asparagus',
-       'axe', 'backpack', 'banana', 'bandage', 'barn', 'baseball',
-       'baseball bat', 'basket', 'basketball', 'bat', 'bathtub', 'beach',
-       'bear', 'beard', 'bed', 'bee', 'belt', 'bench', 'bicycle',
-       'binoculars', 'bird', 'birthday cake', 'blackberry', 'blueberry',
-       'book', 'boomerang', 'bottlecap', 'bowtie', 'bracelet', 'brain',
-       'bread', 'bridge', 'broccoli', 'broom', 'bucket', 'bulldozer',
-       'bus', 'bush', 'butterfly', 'cactus', 'cake', 'calculator',
-       'calendar', 'camel', 'camera', 'camouflage', 'campfire', 'candle',
-       'cannon', 'canoe', 'car', 'carrot', 'castle', 'cat', 'ceiling fan',
-       'cell phone', 'cello', 'chair', 'chandelier', 'church', 'circle',
-       'clarinet', 'clock', 'cloud', 'coffee cup', 'compass', 'computer',
-       'cookie', 'cooler', 'couch', 'cow', 'crab', 'crayon', 'crocodile',
-       'crown', 'cruise ship', 'cup', 'diamond', 'dishwasher',
-       'diving board', 'dog', 'dolphin', 'donut', 'door', 'dragon',
-       'dresser', 'drill', 'drums', 'duck', 'dumbbell', 'ear', 'elbow',
-       'elephant', 'envelope', 'eraser', 'eye', 'eyeglasses', 'face',
-       'fan', 'feather', 'fence', 'finger', 'fire hydrant', 'fireplace',
-       'firetruck', 'fish', 'flamingo', 'flashlight', 'flip flops',
-       'floor lamp', 'flower', 'flying saucer', 'foot', 'fork', 'frog',
-       'frying pan', 'garden', 'garden hose', 'giraffe', 'goatee',
-       'golf club', 'grapes', 'grass', 'guitar', 'hamburger', 'hammer',
-       'hand', 'harp', 'hat', 'headphones', 'hedgehog', 'helicopter',
-       'helmet', 'hexagon', 'hockey puck', 'hockey stick', 'horse',
-       'hospital', 'hot air balloon', 'hot dog', 'hot tub', 'hourglass',
-       'house', 'house plant', 'hurricane', 'ice cream', 'jacket', 'jail',
-       'kangaroo', 'key', 'keyboard', 'knee', 'ladder', 'lantern',
-       'laptop', 'leaf', 'leg', 'light bulb', 'lighthouse', 'lightning',
-       'line', 'lion', 'lipstick', 'lobster', 'lollipop', 'mailbox',
-       'map', 'marker', 'matches', 'megaphone', 'mermaid', 'microphone',
-       'microwave', 'monkey', 'moon', 'mosquito', 'motorbike', 'mountain',
-       'mouse', 'moustache', 'mouth', 'mug', 'mushroom', 'nail',
-       'necklace', 'nose', 'ocean', 'octagon', 'octopus', 'onion', 'oven',
-       'owl', 'paint can', 'paintbrush', 'palm tree', 'panda', 'pants',
-       'paper clip', 'parachute', 'parrot', 'passport', 'peanut', 'pear',
-       'peas', 'pencil', 'penguin', 'piano', 'pickup truck',
-       'picture frame', 'pig', 'pillow', 'pineapple', 'pizza', 'pliers',
-       'police car', 'pond', 'pool', 'popsicle', 'postcard', 'potato',
-       'power outlet', 'purse', 'rabbit', 'raccoon', 'radio', 'rain',
-       'rainbow', 'rake', 'remote control', 'rhinoceros', 'river',
-       'roller coaster', 'rollerskates', 'sailboat', 'sandwich', 'saw',
-       'saxophone', 'school bus', 'scissors', 'scorpion', 'screwdriver',
-       'sea turtle', 'see saw', 'shark', 'sheep', 'shoe', 'shorts',
-       'shovel', 'sink', 'skateboard', 'skull', 'skyscraper',
-       'sleeping bag', 'smiley face', 'snail', 'snake', 'snorkel',
-       'snowflake', 'snowman', 'soccer ball', 'sock', 'speedboat',
-       'spider', 'spoon', 'spreadsheet', 'square', 'squiggle', 'squirrel',
-       'stairs', 'star', 'steak', 'stereo', 'stethoscope', 'stitches',
-       'stop sign', 'stove', 'strawberry', 'streetlight', 'string bean',
-       'submarine', 'suitcase', 'sun', 'swan', 'sweater', 'swing set',
-       'sword', 't-shirt', 'table', 'teapot', 'teddy-bear', 'telephone',
-       'television', 'tennis racquet', 'tent', 'tiger', 'toaster', 'toe',
-       'toilet', 'tooth', 'toothbrush', 'toothpaste', 'tornado',
-       'tractor', 'traffic light', 'train', 'tree', 'triangle',
-       'trombone', 'truck', 'trumpet', 'umbrella', 'underwear', 'van',
-       'vase', 'violin', 'washing machine', 'watermelon', 'waterslide',
-       'whale', 'wheel', 'windmill', 'wine bottle', 'wine glass',
-       'wristwatch', 'yoga', 'zebra', 'zigzag'], dtype=object)
+* `data_valid_predict`  
+Logit prediction of `data_clean_valid` when using a model to predict.  
+Ex: `./logs/clean_model_1_resnet34/dataset.predictions.data_2_valid.logits.satge1.5.npy` 
 
+# Make submission  
+```python
+python make_submission.py
+```
+Make sure you change correct `log_dir` in `make_submission.py`
 
+# How to resume  
+Define the `resume` in `train.yml` and `Run model` again. Usually, we will resume from `checkpoint.best.pth.tar`
+in the `logs` folder.
 
+### Supported architectures and models
 
+#### From [torchvision](https://github.com/pytorch/vision/) package:
+
+- ResNet (`resnet18`, `resnet34`, `resnet50`, `resnet101`, `resnet152`)
+- DenseNet (`densenet121`, `densenet169`, `densenet201`, `densenet161`)
+- Inception v3 (`inception_v3`)
+- VGG (`vgg11`, `vgg11_bn`, `vgg13`, `vgg13_bn`, `vgg16`, `vgg16_bn`, `vgg19`, `vgg19_bn`)
+- SqueezeNet (`squeezenet1_0`, `squeezenet1_1`)
+- AlexNet (`alexnet`)
+
+#### From [Pretrained models for PyTorch](https://github.com/Cadene/pretrained-models.pytorch) package:
+- ResNeXt (`resnext101_32x4d`, `resnext101_64x4d`)
+- NASNet-A Large (`nasnetalarge`)
+- NASNet-A Mobile (`nasnetamobile`)
+- Inception-ResNet v2 (`inceptionresnetv2`)
+- Dual Path Networks (`dpn68`, `dpn68b`, `dpn92`, `dpn98`, `dpn131`, `dpn107`)
+- Inception v4 (`inception_v4`)
+- Xception (`xception`)
+- Squeeze-and-Excitation Networks (`senet154`, `se_resnet50`, `se_resnet101`, `se_resnet152`, `se_resnext50_32x4d`, `se_resnext101_32x4d`)
+- PNASNet-5-Large (`pnasnet5large`)
+- PolyNet (`polynet`)
