@@ -1,0 +1,47 @@
+model_params:
+  fp16: false       # general flag
+  model: FinetuneImage   # model from NETWORKS to use
+  img_encoder:
+     arch: inception_v4
+     num_classes: 340
+     pretrained: True
+
+args:
+  workers: 4
+  model_dir: "quickdraw"
+  baselogdir: "./logs/quickdraw"
+#  resume: "./logs/inception_v4/checkpoint.best.pth.tar"
+
+stages:
+  criterion_params:
+    criterion: CrossEntropyLoss
+
+  data_params:
+    train_split: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/100k_clean/train/"
+    train_token: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/100k_clean/train/"
+
+    valid_split: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/100k_clean/valid/"
+    valid_token: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/100k_clean/valid/"
+
+  callbacks_params:
+    map_args: [3]
+
+  # train head
+  stage1:
+    args:
+      epochs: 6
+      batch_size: 128
+      image_size: 256
+
+    optimizer_params:
+      optimizer: Adam
+      lr: 0.00001
+      weight_decay: 0.0001
+
+    scheduler_params:
+      scheduler: StepLR
+      step_size: 4
+      gamma: 0.1
+
+    data_params:
+      reload_loaders: true

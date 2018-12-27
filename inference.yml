@@ -1,0 +1,13 @@
+data_params:
+  infer_csv: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/csv/test_simplified.csv"
+#  data_clean_train: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/100k_clean_unrecognized/train/"
+#  data_clean_valid: "/media/ngxbac/Bac/competition/kaggle/competition_data/quickdraw/data/100k_clean_unrecognized/valid/"
+
+
+args:
+  batch_size: 256
+  image_size: 128
+  use_tta: True
+
+stages: null
+callbacks_params: null
